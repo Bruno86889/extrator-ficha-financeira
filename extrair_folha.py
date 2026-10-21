@@ -5,8 +5,6 @@ from tkinter import filedialog, messagebox, simpledialog
 
 import pdfplumber
 from openpyxl import Workbook
-from openpyxl.styles import Alignment, Font, PatternFill
-from openpyxl.utils import get_column_letter
 
 MESES = {
     "JANEIRO": 1, "FEVEREIRO": 2, "MARÇO": 3, "MARCO": 3,
@@ -183,40 +181,6 @@ def gerar_excel(registros, vd_escolhido, destino):
             converter_numero_br(lancamento["qtde"]),
             lancamento["pagina"],
         ])
-
-    # Aba de resumo mensal. Se houver mais de um lançamento para o mesmo mês,
-    # mantém as ocorrências separadas na aba Extração e soma as quantidades no resumo.
-    resumo = wb.create_sheet("Resumo mensal")
-    resumo.append(["Ano", "Mês", "Quantidade (Qtde)"])
-    agrupado = {}
-    for lancamento in lancamentos_filtrados:
-        chave = (lancamento["ano"], lancamento["mes"])
-        agrupado.setdefault(chave, []).append(converter_numero_br(lancamento["qtde"]))
-
-    for (ano, mes), valores in sorted(
-        agrupado.items(),
-        key=lambda item: (item[0][0] or 9999, ordem_meses.get(item[0][1], 99)),
-    ):
-        numeros = [v for v in valores if v is not None]
-        resumo.append([ano, mes, sum(numeros) if numeros else None, len(valores)])
-
-    # Formatação básica das planilhas.
-    for planilha in (ws, resumo):
-        planilha.freeze_panes = "A2"
-        planilha.auto_filter.ref = planilha.dimensions
-        for celula in planilha[1]:
-            celula.font = Font(bold=True, color="FFFFFF")
-            celula.fill = PatternFill("solid", fgColor="1F4E78")
-            celula.alignment = Alignment(vertical="center", wrap_text=True)
-        for coluna in planilha.columns:
-            letra = get_column_letter(coluna[0].column)
-            maior = max(len(str(c.value or "")) for c in coluna)
-            planilha.column_dimensions[letra].width = min(max(maior + 2, 12), 48)
-
-    for linha in ws.iter_rows(min_row=2):
-        linha[4].number_format = "0.00"
-    for linha in resumo.iter_rows(min_row=2):
-        linha[2].number_format = "0.00"
 
     wb.save(destino)
     return len(lancamentos_filtrados)
