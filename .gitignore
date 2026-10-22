@@ -39,7 +39,6 @@ Thumbs.db
 Desktop.ini
 
 build/
-dist/
 *.egg-info/
 .eggs/
 wheels/
