@@ -32,7 +32,7 @@ def extrair_linhas(pdf_path):
     Extrai as linhas usando coordenadas dos elementos do PDF.
     Isso permite distinguir Qtde de Valor, Percentual e outros números.
     """
-    registros = [Lancamento]
+    registros = []
     rubricas = set()
     mes_atual = None
     secao_atual = ""
