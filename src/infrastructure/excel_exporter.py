@@ -23,7 +23,8 @@ def gerar_excel(registros, vd_escolhido, destino):
     # Correspondência por texto normalizado. Permite escolher a denominação exibida.
     lancamentos_filtrados = [
         r for r in registros
-        if normalizar_texto(r["denominacao"]) == vd_escolhido_norm
+        if normalizar_texto(r["denominacao"]) == vd_escolhido_norm 
+        if r["natureza"] == "5"
     ]
 
     if not lancamentos_filtrados:
@@ -43,7 +44,7 @@ def gerar_excel(registros, vd_escolhido, destino):
     ws.title = "Extração"
 
     cabecalhos = [
-        "Ano", "Mês", "Rubrica", "VD", "Qtde", "Página do PDF",
+        "Ano", "Mês", "Hora Aula Semanal",
     ]
     ws.append(cabecalhos)
 
@@ -51,10 +52,7 @@ def gerar_excel(registros, vd_escolhido, destino):
         ws.append([
             lancamento["ano"],
             lancamento["mes"],
-            lancamento["denominacao"],
-            f"{lancamento["codigo"]} {lancamento["natureza"]}",
             converter_numero_br(lancamento["qtde"]),
-            lancamento["pagina"],
         ])
 
     wb.save(destino)
