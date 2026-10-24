@@ -1,3 +1,5 @@
+import os
+import threading
 import tkinter as tk
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
@@ -20,19 +22,28 @@ COLORS = {
     "soft_green": "#ECFDF3",
 }
 
+VD_HORA_AULA = "HORA AULA SEMANAL - ETEC"
+VD_HORA_COORDENACAO = "HAE COORDENACAO SEMANAL - ETEC"
+
 
 class App(tk.Tk):
     def __init__(self):
         super().__init__()
 
         self.title("Extrator de Folha de Pagamento")
-        self.geometry("900x720")
-        self.minsize(760, 650)
+        self.geometry("1020x720")
+        self.minsize(1020, 650)
         self.configure(bg=COLORS["background"])
 
         # Estado da interface
         self.pdf_path = tk.StringVar()
-        self.rubrica_var_01 = tk.StringVar()
+        self.vds_selecionados = tk.StringVar()
+        self.vds_selecionados = []
+
+        self.vd_hora_aula_var = tk.StringVar()
+        self.vd_coordenacao_var = tk.StringVar()
+        self.vd_cp_oe_var = tk.StringVar()
+        self.vd_hae_outros_var = tk.StringVar()
 
         self._configure_styles()
         self._build_ui()
@@ -56,7 +67,6 @@ class App(tk.Tk):
             selectbackground=[("readonly", COLORS["surface"])],
             selectforeground=[("readonly", COLORS["text"])],
         )
-
         style.configure(
             "Primary.TButton",
             padding=(16, 11),
@@ -97,7 +107,10 @@ class App(tk.Tk):
         icon_box.pack(side="left", padx=(0, 14))
         icon_box.pack_propagate(False)
         tk.Label(
-            icon_box, text="", bg=COLORS["primary"], fg="#FFFFFF",
+            icon_box,
+            text="",
+            bg=COLORS["primary"],
+            fg="#FFFFFF",
             font=("Segoe UI", 13, "bold"),
         ).pack(expand=True)
 
@@ -105,21 +118,43 @@ class App(tk.Tk):
         title_box.pack(side="left", fill="x", expand=True)
 
         tk.Label(
-            title_box, text="Extrator de Folha de Pagamento",
-            bg=COLORS["background"], fg=COLORS["text"],
-            font=("Segoe UI", 20, "bold"), anchor="w",
+            title_box,
+            text="Extrator de Folha de Pagamento",
+            bg=COLORS["background"],
+            fg=COLORS["text"],
+            font=("Segoe UI", 20, "bold"),
+            anchor="w",
         ).pack(anchor="w")
 
+        professor_card = self._card(root)
+        self._section_title(professor_card, "Nome do Funcionário")
+        professor_row = tk.Frame(professor_card, bg=COLORS["surface"])
+        professor_row.pack(fill="x")
+
+        professor_nome_entry = tk.Entry(
+            professor_row,
+            font=("Segoe UI", 10),
+            fg=COLORS["surface"],
+            background=COLORS["surface"],
+            foreground=COLORS["text"],
+        )
+
+        professor_nome_entry.pack(fill="x", pady=(12, 0))
 
         # Cartão: arquivo de origem
         file_card = self._card(root)
-        self._section_title(file_card, "1. Arquivo de origem")
+        self._section_title(file_card, "Arquivo de origem")
         file_row = tk.Frame(file_card, bg=COLORS["surface"])
         file_row.pack(fill="x", pady=(12, 0))
 
         self.file_icon = tk.Label(
-            file_row, text="PDF", bg="#FEF2F2", fg=COLORS["danger"],
-            font=("Segoe UI", 10, "bold"), width=5, pady=10,
+            file_row,
+            text="PDF",
+            bg="#FEF2F2",
+            fg=COLORS["danger"],
+            font=("Segoe UI", 10, "bold"),
+            width=5,
+            pady=10,
         )
         self.file_icon.pack(side="left", padx=(0, 12))
 
@@ -127,120 +162,245 @@ class App(tk.Tk):
         file_info.pack(side="left", fill="x", expand=True)
 
         self.file_name_label = tk.Label(
-            file_info, text="Nenhum arquivo selecionado",
-            bg=COLORS["surface"], fg=COLORS["text"],
-            font=("Segoe UI", 10, "bold"), anchor="w",
+            file_info,
+            text="Nenhum arquivo selecionado",
+            bg=COLORS["surface"],
+            fg=COLORS["text"],
+            font=("Segoe UI", 10, "bold"),
+            anchor="w",
         )
         self.file_name_label.pack(fill="x")
 
         self.file_path_label = tk.Label(
-            file_info, text="Selecione a ficha financeira em formato PDF",
-            bg=COLORS["surface"], fg=COLORS["muted"],
-            font=("Segoe UI", 9), anchor="w",
+            file_info,
+            text="Selecione a ficha financeira em formato PDF",
+            bg=COLORS["surface"],
+            fg=COLORS["muted"],
+            font=("Segoe UI", 9),
+            anchor="w",
         )
         self.file_path_label.pack(fill="x", pady=(4, 0))
 
-        ttk.Button(
-            file_row, text="Selecionar PDF", style="Secondary.TButton",
+        self.select_pdf_button = ttk.Button(
+            file_row,
+            text="Selecionar PDF",
+            style="Secondary.TButton",
             command=self.select_pdf,
-        ).pack(side="right", padx=(12, 0))
+        )
+        self.select_pdf_button.pack(side="right", padx=(12, 0))
 
-        # Cartão: rubrica
-        rubric_card = self._card(root)
-        self._section_title(rubric_card, "2. Rubrica para extrair")
+        # Card de selação de VD de hora aula
+        hora_aula_card = self._card(root)
+        self._section_title(hora_aula_card, "Hora Aula")
 
-        self.rubrica_combo = ttk.Combobox(
-            rubric_card,
-            textvariable=self.rubrica_var_01,
+        self.vd_combo_hora_aula = ttk.Combobox(
+            hora_aula_card,
+            textvariable=self.vd_hora_aula_var,
+            state="readonly",
+            style="App.TCombobox",
+            font=("Segoe UI", 10),
+        )
+
+        self.vd_combo_hora_aula.pack(fill="x", pady=(6, 0))
+        self.vd_combo_hora_aula.set(VD_HORA_AULA)
+
+        # Card de selação de VD de coordenação
+        coordenacao_card = self._card(root)
+        self._section_title(coordenacao_card, "HAE Coordenação")
+
+        self.vd_combo_coordenacao = ttk.Combobox(
+            coordenacao_card,
+            textvariable=self.vd_coordenacao_var,
             values=[],
             state="readonly",
             style="App.TCombobox",
             font=("Segoe UI", 10),
         )
 
-        self.rubrica_combo.pack(fill="x", pady=(6, 0))
-        self.rubrica_combo.set("Selecione primeiro um arquivo PDF")
+        self.vd_combo_coordenacao.pack(fill="x", pady=(6, 0))
+        self.vd_combo_coordenacao.set(VD_HORA_COORDENACAO)
+
+        # Card de selação de VD de CP ou OE
+        cp_or_card = self._card(root)
+        self._section_title(cp_or_card, "CP/OE")
+
+        self.vd_combo_cp_oe = ttk.Combobox(
+            cp_or_card,
+            textvariable=self.vd_cp_oe_var,
+            values=[],
+            state="readonly",
+            style="App.TCombobox",
+            font=("Segoe UI", 10),
+        )
+
+        self.vd_combo_cp_oe.pack(fill="x", pady=(6, 0))
+        self.vd_combo_cp_oe.set("Selecione primeiro um arquivo PDF")
+
+        # Card de selação de HAE Outros
+        cp_or_card = self._card(root)
+        self._section_title(cp_or_card, "HAE Outros")
+
+        self.vd_combo_hae_outros = ttk.Combobox(
+            cp_or_card,
+            textvariable=self.vd_hae_outros_var,
+            values=[],
+            state="readonly",
+            style="App.TCombobox",
+            font=("Segoe UI", 10),
+        )
+
+        self.vd_combo_hae_outros.pack(fill="x", pady=(6, 0))
+        self.vd_combo_hae_outros.set("Selecione primeiro um arquivo PDF")
 
         # Rodapé com status e exportação
         footer = tk.Frame(root, bg=COLORS["background"])
         footer.pack(fill="x", pady=(2, 0))
 
-
         self.export_button = ttk.Button(
-            footer, text="Exportar para Excel", style="Primary.TButton",
+            footer,
+            text="Exportar para Excel",
+            style="Primary.TButton",
             command=self.export_excel,
         )
         self.export_button.pack(side="right")
 
     def _card(self, parent):
         card = tk.Frame(
-            parent, bg=COLORS["surface"], padx=18, pady=16,
-            highlightbackground=COLORS["border"], highlightthickness=1,
+            parent,
+            bg=COLORS["surface"],
+            padx=18,
+            pady=16,
+            highlightbackground=COLORS["border"],
+            highlightthickness=1,
         )
         card.pack(fill="x", pady=(0, 14))
         return card
 
     def _section_title(self, parent, text):
         tk.Label(
-            parent, text=text, bg=COLORS["surface"], fg=COLORS["text"],
-            font=("Segoe UI", 11, "bold"), anchor="w",
+            parent,
+            text=text,
+            bg=COLORS["surface"],
+            fg=COLORS["text"],
+            font=("Segoe UI", 11, "bold"),
+            anchor="w",
         ).pack(fill="x")
 
+
     def select_pdf(self):
-        """Abre o seletor de PDF. Integre aqui a leitura e análise do arquivo."""
+        """Seleciona o PDF e inicia a leitura em segundo plano."""
         selected = filedialog.askopenfilename(
             title="Selecione a ficha financeira",
             filetypes=[("Arquivos PDF", "*.pdf")],
         )
+
         if not selected:
             return
 
-        _, rubricas = extrair_linhas(selected)
+        # Atualiza a interface antes de iniciar o processamento.
+        self.select_pdf_button.config(state="disabled")
+        self.export_button.config(state="disabled")
 
-        self.rubrica_combo["values"] = rubricas
+        self.file_name_label.config(text=Path(selected).name)
+        self.file_path_label.config(text="Processando PDF, aguarde...")
 
-        if rubricas:
-            self.rubrica_combo.current(0)
+        # A leitura será executada fora da thread da interface.
+        thread = threading.Thread(
+            target=self._process_pdf,
+            args=(selected,),
+            daemon=True,
+        )
+        thread.start()
+
+
+    def _process_pdf(self, selected):
+        """Executa o processamento sem bloquear a interface."""
+        try:
+            registros, rubricas = extrair_linhas(selected)
+
+            # A atualização dos widgets ocorre na thread principal.
+            self.after(
+                0,
+                lambda: self._on_pdf_processed(selected, registros, rubricas, None),
+            )
+
+        except Exception as exc:
+            self.after(
+                0,
+                lambda error=exc: self._on_pdf_processed(selected, None, None, error),
+            )
+
+
+    def _on_pdf_processed(self, selected, registros, rubricas, error):
+        """Finaliza o processamento e atualiza a interface."""
+        self.select_pdf_button.config(state="normal")
+        self.export_button.config(state="normal")
+
+        if error is not None:
+            self.file_path_label.config(text="Não foi possível processar o PDF.")
+            messagebox.showerror(
+                "Erro ao ler PDF",
+                str(error),
+            )
+            return
 
         self.pdf_path.set(selected)
+        self.registros = registros
+
+        self.vd_combo_hora_aula["values"] = rubricas
+
+        # Seleciona a rubrica padrão caso esteja disponível.
+        if VD_HORA_AULA in rubricas:
+            self.vd_combo_hora_aula.set(VD_HORA_AULA)
+        elif rubricas:
+            self.vd_combo_hora_aula.set(rubricas[0])
+        else:
+            self.vd_combo_hora_aula.set("")
+
         self.file_name_label.config(text=Path(selected).name)
-        self.file_path_label.config(text=selected)
+        self.file_path_label.config(text="PDF processado com sucesso.")
 
     def export_excel(self):
         """Valida a seleção e pede o destino. Integre aqui a geração do Excel."""
-        if not self.pdf_path.get():
-            messagebox.showwarning("Arquivo necessário", "Selecione um arquivo PDF primeiro.")
+
+        caminho_arquivo = self.pdf_path.get()
+
+        if not caminho_arquivo:
+            messagebox.showwarning(
+                "Arquivo necessário", "Selecione um arquivo PDF primeiro."
+            )
             return
 
-        rubrica = self.rubrica_var_01.get().strip()
+        rubrica = self.vd_hora_aula_var.get().strip()
         if not rubrica or rubrica == "Selecione primeiro um arquivo PDF":
             messagebox.showwarning("Rubrica necessária", "Selecione uma rubrica.")
             return
 
+        nome_arquivo = os.path.basename(caminho_arquivo).split(".")[0]
+        nome_arquivo_resuldado = nome_arquivo + "_extraido"
+
+        print(nome_arquivo_resuldado)
         destino = filedialog.asksaveasfilename(
             title="Salvar planilha Excel",
             defaultextension=".xlsx",
-            initialfile="extracao_folha.xlsx",
+            initialfile=nome_arquivo_resuldado,
             filetypes=[("Planilha Excel", "*.xlsx")],
         )
         if not destino:
             return
 
         try:
-            print(self.pdf_path.get())
-            registros, _ = extrair_linhas(self.pdf_path.get())
-            quantidade = gerar_excel(registros, rubrica, destino)
+            quantidade = gerar_excel(self.registros, rubrica, destino)
             messagebox.showinfo(
-                    "Extração concluída",
-                    f"Rubrica: {rubrica}\n"
-                    f"Lançamentos encontrados: {quantidade}\n\n"
-                    f"Planilha salva em:\n{destino}",
-                )
+                "Extração concluída",
+                f"Rubrica: {rubrica}\n"
+                f"Lançamentos encontrados: {quantidade}\n\n"
+                f"Planilha salva em:\n{destino}",
+            )
 
             self.pdf_path.set("")
-            self.rubrica_combo.set("")
+            self.vd_combo_hora_aula.set("")
             self.file_name_label.config(text="")
             self.file_path_label.config(text="")
         except Exception as exc:  # noqa: BLE001
             messagebox.showerror("Erro ao gerar planilha", str(exc))
-        
