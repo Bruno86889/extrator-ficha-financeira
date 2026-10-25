@@ -4,26 +4,12 @@ import tkinter as tk
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 
+import constants
 from infrastructure.excel_exporter import gerar_excel
 from infrastructure.pdf_reader import extrair_linhas
 
-# Paleta visual
-COLORS = {
-    "background": "#F4F6FA",
-    "surface": "#FFFFFF",
-    "primary": "#2563EB",
-    "primary_hover": "#1D4ED8",
-    "text": "#172033",
-    "muted": "#667085",
-    "border": "#D9E0EA",
-    "success": "#16A34A",
-    "danger": "#DC2626",
-    "soft_blue": "#EFF6FF",
-    "soft_green": "#ECFDF3",
-}
-
-VD_HORA_AULA = "HORA AULA SEMANAL - ETEC"
-VD_HORA_COORDENACAO = "HAE COORDENACAO SEMANAL - ETEC"
+from .styles import COLORS
+from .widgets.header import AppHeader
 
 
 class App(tk.Tk):
@@ -31,14 +17,13 @@ class App(tk.Tk):
         super().__init__()
 
         self.title("Extrator de Folha de Pagamento")
-        self.geometry("1020x720")
-        self.minsize(1020, 650)
         self.configure(bg=COLORS["background"])
 
         # Estado da interface
         self.pdf_path = tk.StringVar()
         self.vds_selecionados = tk.StringVar()
         self.vds_selecionados = []
+        self.nome_empregado = tk.StringVar()
 
         self.vd_hora_aula_var = tk.StringVar()
         self.vd_coordenacao_var = tk.StringVar()
@@ -99,47 +84,7 @@ class App(tk.Tk):
         root = tk.Frame(self, bg=COLORS["background"])
         root.pack(fill="both", expand=True, padx=30, pady=26)
 
-        # Cabeçalho
-        header = tk.Frame(root, bg=COLORS["background"])
-        header.pack(fill="x", pady=(0, 22))
-
-        icon_box = tk.Frame(header, bg=COLORS["primary"], width=52, height=52)
-        icon_box.pack(side="left", padx=(0, 14))
-        icon_box.pack_propagate(False)
-        tk.Label(
-            icon_box,
-            text="",
-            bg=COLORS["primary"],
-            fg="#FFFFFF",
-            font=("Segoe UI", 13, "bold"),
-        ).pack(expand=True)
-
-        title_box = tk.Frame(header, bg=COLORS["background"])
-        title_box.pack(side="left", fill="x", expand=True)
-
-        tk.Label(
-            title_box,
-            text="Extrator de Folha de Pagamento",
-            bg=COLORS["background"],
-            fg=COLORS["text"],
-            font=("Segoe UI", 20, "bold"),
-            anchor="w",
-        ).pack(anchor="w")
-
-        professor_card = self._card(root)
-        self._section_title(professor_card, "Nome do Funcionário")
-        professor_row = tk.Frame(professor_card, bg=COLORS["surface"])
-        professor_row.pack(fill="x")
-
-        professor_nome_entry = tk.Entry(
-            professor_row,
-            font=("Segoe UI", 10),
-            fg=COLORS["surface"],
-            background=COLORS["surface"],
-            foreground=COLORS["text"],
-        )
-
-        professor_nome_entry.pack(fill="x", pady=(12, 0))
+        AppHeader(root, COLORS).pack(fill="x")
 
         # Cartão: arquivo de origem
         file_card = self._card(root)
@@ -189,6 +134,19 @@ class App(tk.Tk):
         )
         self.select_pdf_button.pack(side="right", padx=(12, 0))
 
+        employee_card = self._card(root)
+        self._section_title(employee_card, "Nome do Funcionário")
+
+        self.input_empregado = ttk.Entry(
+            employee_card,
+            font=("Segoe UI", 10),
+            background=COLORS["surface"],
+            foreground=COLORS["text"],
+            textvariable=self.nome_empregado,
+        )
+
+        self.input_empregado.pack(fill="x", pady=(12, 0))
+
         # Card de selação de VD de hora aula
         hora_aula_card = self._card(root)
         self._section_title(hora_aula_card, "Hora Aula")
@@ -202,7 +160,7 @@ class App(tk.Tk):
         )
 
         self.vd_combo_hora_aula.pack(fill="x", pady=(6, 0))
-        self.vd_combo_hora_aula.set(VD_HORA_AULA)
+        self.vd_combo_hora_aula.set(constants.VD_HORA_AULA)
 
         # Card de selação de VD de coordenação
         coordenacao_card = self._card(root)
@@ -211,14 +169,13 @@ class App(tk.Tk):
         self.vd_combo_coordenacao = ttk.Combobox(
             coordenacao_card,
             textvariable=self.vd_coordenacao_var,
-            values=[],
             state="readonly",
             style="App.TCombobox",
             font=("Segoe UI", 10),
         )
 
         self.vd_combo_coordenacao.pack(fill="x", pady=(6, 0))
-        self.vd_combo_coordenacao.set(VD_HORA_COORDENACAO)
+        self.vd_combo_coordenacao.set(constants.VD_COORDENACAO)
 
         # Card de selação de VD de CP ou OE
         cp_or_card = self._card(root)
@@ -227,14 +184,13 @@ class App(tk.Tk):
         self.vd_combo_cp_oe = ttk.Combobox(
             cp_or_card,
             textvariable=self.vd_cp_oe_var,
-            values=[],
             state="readonly",
             style="App.TCombobox",
             font=("Segoe UI", 10),
         )
 
         self.vd_combo_cp_oe.pack(fill="x", pady=(6, 0))
-        self.vd_combo_cp_oe.set("Selecione primeiro um arquivo PDF")
+        self.vd_combo_cp_oe.set(constants.VD_CP_OE)
 
         # Card de selação de HAE Outros
         cp_or_card = self._card(root)
@@ -243,14 +199,13 @@ class App(tk.Tk):
         self.vd_combo_hae_outros = ttk.Combobox(
             cp_or_card,
             textvariable=self.vd_hae_outros_var,
-            values=[],
             state="readonly",
             style="App.TCombobox",
             font=("Segoe UI", 10),
         )
 
         self.vd_combo_hae_outros.pack(fill="x", pady=(6, 0))
-        self.vd_combo_hae_outros.set("Selecione primeiro um arquivo PDF")
+        self.vd_combo_hae_outros.set(constants.VD_HAE_OUTROS)
 
         # Rodapé com status e exportação
         footer = tk.Frame(root, bg=COLORS["background"])
@@ -263,6 +218,14 @@ class App(tk.Tk):
             command=self.export_excel,
         )
         self.export_button.pack(side="right")
+        
+        self.clear_button = ttk.Button(
+            footer,
+            text="Limpar",
+            style="Secondary.TButton",
+            command=self._clear,
+        )
+        self.clear_button.pack(side="right")
 
     def _card(self, parent):
         card = tk.Frame(
@@ -285,7 +248,6 @@ class App(tk.Tk):
             font=("Segoe UI", 11, "bold"),
             anchor="w",
         ).pack(fill="x")
-
 
     def select_pdf(self):
         """Seleciona o PDF e inicia a leitura em segundo plano."""
@@ -312,7 +274,6 @@ class App(tk.Tk):
         )
         thread.start()
 
-
     def _process_pdf(self, selected):
         """Executa o processamento sem bloquear a interface."""
         try:
@@ -324,12 +285,11 @@ class App(tk.Tk):
                 lambda: self._on_pdf_processed(selected, registros, rubricas, None),
             )
 
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             self.after(
                 0,
                 lambda error=exc: self._on_pdf_processed(selected, None, None, error),
             )
-
 
     def _on_pdf_processed(self, selected, registros, rubricas, error):
         """Finaliza o processamento e atualiza a interface."""
@@ -348,21 +308,14 @@ class App(tk.Tk):
         self.registros = registros
 
         self.vd_combo_hora_aula["values"] = rubricas
-
-        # Seleciona a rubrica padrão caso esteja disponível.
-        if VD_HORA_AULA in rubricas:
-            self.vd_combo_hora_aula.set(VD_HORA_AULA)
-        elif rubricas:
-            self.vd_combo_hora_aula.set(rubricas[0])
-        else:
-            self.vd_combo_hora_aula.set("")
+        self.vd_combo_coordenacao["values"] = rubricas
+        self.vd_combo_cp_oe["values"] = rubricas
+        self.vd_combo_hae_outros["values"] = rubricas
 
         self.file_name_label.config(text=Path(selected).name)
         self.file_path_label.config(text="PDF processado com sucesso.")
 
     def export_excel(self):
-        """Valida a seleção e pede o destino. Integre aqui a geração do Excel."""
-
         caminho_arquivo = self.pdf_path.get()
 
         if not caminho_arquivo:
@@ -372,6 +325,7 @@ class App(tk.Tk):
             return
 
         rubrica = self.vd_hora_aula_var.get().strip()
+
         if not rubrica or rubrica == "Selecione primeiro um arquivo PDF":
             messagebox.showwarning("Rubrica necessária", "Selecione uma rubrica.")
             return
@@ -379,7 +333,6 @@ class App(tk.Tk):
         nome_arquivo = os.path.basename(caminho_arquivo).split(".")[0]
         nome_arquivo_resuldado = nome_arquivo + "_extraido"
 
-        print(nome_arquivo_resuldado)
         destino = filedialog.asksaveasfilename(
             title="Salvar planilha Excel",
             defaultextension=".xlsx",
@@ -390,17 +343,29 @@ class App(tk.Tk):
             return
 
         try:
-            quantidade = gerar_excel(self.registros, rubrica, destino)
+            vds = [
+                self.vd_hora_aula_var.get(),
+                self.vd_coordenacao_var.get(),
+                self.vd_cp_oe_var.get(),
+                self.vd_hae_outros_var.get(),
+            ]
+            gerar_excel(self.registros, self.input_empregado.get(), vds, destino)
             messagebox.showinfo(
                 "Extração concluída",
-                f"Rubrica: {rubrica}\n"
-                f"Lançamentos encontrados: {quantidade}\n\n"
                 f"Planilha salva em:\n{destino}",
             )
 
-            self.pdf_path.set("")
-            self.vd_combo_hora_aula.set("")
-            self.file_name_label.config(text="")
-            self.file_path_label.config(text="")
+            self._clear()
+
         except Exception as exc:  # noqa: BLE001
             messagebox.showerror("Erro ao gerar planilha", str(exc))
+
+    def _clear(self):
+        self.pdf_path.set("")
+        self.vd_hora_aula_var.set(constants.VD_HORA_AULA)
+        self.vd_coordenacao_var.set(constants.VD_COORDENACAO)
+        self.vd_cp_oe_var.set(constants.VD_CP_OE)
+        self.vd_hae_outros_var.set(constants.VD_HAE_OUTROS)
+        self.file_name_label.config(text="Nenhum arquivo selecionado")
+        self.file_path_label.config(text="Selecione a ficha financeira em formato PDF")
+        self.nome_empregado.set("")
