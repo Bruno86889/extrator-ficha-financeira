@@ -4,7 +4,7 @@ from openpyxl import Workbook
 from openpyxl.formatting.rule import CellIsRule
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 
-from constants import MESES
+from constants import MESES, VD_FALTA_DOCENTE
 from domain.numbers import converter_numero_br
 from domain.text import normalizar_texto
 
@@ -17,6 +17,27 @@ def filtrar_por_vd_escolhido(registros, vd_escolhido):
         for r in registros
         if normalizar_texto(r["denominacao"]) == vd_escolhido_norm
         if r["natureza"] == "5"
+    ]
+
+    ordem_meses = {nome.title(): numero for nome, numero in MESES.items()}
+    lancamentos_filtrados.sort(
+        key=lambda r: (
+            r["ano"] is None,
+            r["ano"] or 9999,
+            ordem_meses.get(r["mes"], 99),
+            r["pagina"],
+        )
+    )
+
+    return lancamentos_filtrados
+
+def filtrar_faltas(registros):
+    vd_escolhido_norm = normalizar_texto(VD_FALTA_DOCENTE)
+
+    lancamentos_filtrados = [
+        r
+        for r in registros
+        if normalizar_texto(r["denominacao"]) == vd_escolhido_norm
     ]
 
     ordem_meses = {nome.title(): numero for nome, numero in MESES.items()}
@@ -48,7 +69,60 @@ def agrupar_por_mes(registros):
     return agrupados
 
 
+cinza = "D0D0D0"
+preto = "000000"
+
+preenchimento_cabecalho = PatternFill(
+    fill_type="solid",
+    fgColor=cinza,
+)
+
+borda_fina = Side(
+    style="thin",
+    color=preto,
+)
+
+borda = Border(
+    left=borda_fina,
+    right=borda_fina,
+    top=borda_fina,
+    bottom=borda_fina,
+)
+
+alinhamento_central = Alignment(
+    horizontal="center",
+    vertical="center",
+)
+
+fonte_cabecalho = Font(
+    name="Arial",
+    size=10,
+    bold=True,
+    color=preto,
+)
+
+fonte_dados = Font(
+    name="Arial",
+    size=10,
+    color=preto,
+)
+
 def gerar_excel(registros, nome_funcionario: str, vds: list[str], destino):
+    wb = Workbook()
+    ws = wb.active
+    assert ws is not None
+
+    ws.title = "Carga Horária"
+
+    # === Formata a linha do nome do funcionario ==== #
+    ws.merge_cells("B2:C2")
+    ws.merge_cells("D2:G2")
+
+    ws["B2"] = "NOME"
+    ws["D2"] = nome_funcionario.upper()
+
+    #==================================================#
+
     vd_hora_aula = vds[0]
     vd_coordenacao = vds[1]
     vd_cp_oe = vds[2]
@@ -97,56 +171,6 @@ def gerar_excel(registros, nome_funcionario: str, vds: list[str], destino):
         ),
     )
 
-    wb = Workbook()
-    ws = wb.active
-    assert ws is not None
-
-    ws.title = "Carga Horária"
-
-    cinza = "D0D0D0"
-    preto = "000000"
-
-    preenchimento_cabecalho = PatternFill(
-        fill_type="solid",
-        fgColor=cinza,
-    )
-
-    borda_fina = Side(
-        style="thin",
-        color=preto,
-    )
-
-    borda = Border(
-        left=borda_fina,
-        right=borda_fina,
-        top=borda_fina,
-        bottom=borda_fina,
-    )
-
-    alinhamento_central = Alignment(
-        horizontal="center",
-        vertical="center",
-    )
-
-    fonte_cabecalho = Font(
-        name="Arial",
-        size=10,
-        bold=True,
-        color=preto,
-    )
-
-    fonte_dados = Font(
-        name="Arial",
-        size=10,
-        color=preto,
-    )
-
-    ws.merge_cells("B2:C2")
-    ws.merge_cells("D2:G2")
-
-    ws["B2"] = "NOME"
-    ws["D2"] = nome_funcionario.upper()
-
     for linha in ws.iter_rows(
         min_row=2,
         max_row=2,
@@ -159,10 +183,6 @@ def gerar_excel(registros, nome_funcionario: str, vds: list[str], destino):
             celula.alignment = alinhamento_central
             celula.font = fonte_cabecalho
 
-    ws.merge_cells("B4:B5")
-    ws.merge_cells("C4:C5")
-    ws.merge_cells("D4:G4")
-
     ws["B4"] = "ANO"
     ws["C4"] = "MÊS"
     ws["D4"] = "RUBRICAS"
@@ -172,6 +192,11 @@ def gerar_excel(registros, nome_funcionario: str, vds: list[str], destino):
     ws["F5"] = "CP/OE"
     ws["G5"] = "HAE OUTROS"
 
+    ws.merge_cells("B4:B5")
+    ws.merge_cells("C4:C5")
+    ws.merge_cells("D4:G4")
+
+    # Formata relatório de Vds
     for linha in ws.iter_rows(
         min_row=4,
         max_row=5,
@@ -184,6 +209,7 @@ def gerar_excel(registros, nome_funcionario: str, vds: list[str], destino):
             celula.alignment = alinhamento_central
             celula.font = fonte_cabecalho
 
+    # Monta relatório de Vds
     for numero_linha, (ano, mes) in enumerate(periodos, start=6):
         valores = [
             int(ano),
@@ -208,6 +234,46 @@ def gerar_excel(registros, nome_funcionario: str, vds: list[str], destino):
             if coluna >= 4:
                 celula.number_format = "#,##0.00"
 
+    ws.merge_cells("I4:J4")
+    ws["I4"] = "FALTAS"
+    ws["I5"] = "DATA"
+    ws["J5"] = "AULA"
+
+    for linha in ws.iter_rows(
+            min_row=4,
+            max_row=5,
+            min_col=9,
+            max_col=10,
+        ):
+            for celula in linha:
+                celula.fill = preenchimento_cabecalho
+                celula.border = borda
+                celula.alignment = alinhamento_central
+                celula.font = fonte_cabecalho
+
+    faltas = filtrar_faltas(registros)
+
+    for numero_linha, falta in enumerate(faltas, start=6):
+        valores = [
+            falta["data"],
+            falta["qtde"]
+        ]
+
+        for coluna, valor in enumerate(valores, start=9):
+            celula = ws.cell(
+                row=numero_linha,
+                column=coluna,
+                value=valor
+            )
+
+            celula.font = fonte_dados
+            celula.border = borda
+            celula.alignment = alinhamento_central
+
+            if coluna == 10:
+                celula.number_format = "#,##0.00"
+
+
     larguras = {
         "A": 3,
         "B": 9,
@@ -217,6 +283,8 @@ def gerar_excel(registros, nome_funcionario: str, vds: list[str], destino):
         "F": 22,
         "G": 22,
         "H": 3,
+        "I": 14,
+        "J": 14,
     }
 
     for coluna, largura in larguras.items():
@@ -229,7 +297,7 @@ def gerar_excel(registros, nome_funcionario: str, vds: list[str], destino):
     preenchimento_zero = PatternFill(fill_type="solid", fgColor="D9D9D9")
     fonte_zero = Font(name="Calibri", size=10, color="808080")
 
-    ultima_linha = 5 + len(periodos)
+    ultima_linha = 5 + max(len(periodos), len(faltas))
 
     ws.conditional_formatting.add(
         f"D6:G{ultima_linha}",
@@ -242,7 +310,8 @@ def gerar_excel(registros, nome_funcionario: str, vds: list[str], destino):
         ws.row_dimensions[linha].height = 20
 
     ws.sheet_view.showGridLines = False
-    assert ws.sheet_properties.pageSetUpPr is not None
+
+
 
     wb.save(destino)
 

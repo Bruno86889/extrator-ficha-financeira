@@ -10,6 +10,8 @@ from domain.text import normalizar_texto
 QTDE_X_MIN = 118
 QTDE_X_MAX = 166
 
+DATA_X_MIN = 264
+DATA_X_MAX = 298
 
 MESES = {
     "JANEIRO": "Janeiro",
@@ -59,6 +61,7 @@ def extrair_linhas(pdf_path):
 
                 # A ficha tem cabeçalhos como "FOLHA NORMAL JANEIRO/2025".
                 candidato_mes = extrair_mes_ano_da_linha(texto_linha)
+
                 if candidato_mes and (
                     "FOLHA" in texto_norm
                     or "JANEIRO/" in texto_norm
@@ -78,11 +81,18 @@ def extrair_linhas(pdf_path):
                     mes_atual = candidato_mes
 
                 # Guarda o tipo de folha/seção para ajudar a identificar duplicidades.
-                if any(k in texto_norm for k in (
-                    "FOLHA NORMAL", "FERIAS COLETIVAS", "FÉRIAS COLETIVAS",
-                    "ADIANTAMENTO", "13.SALARIO", "13. SALARIO",
-                    "BR RESULTADOS",
-                )):
+                if any(
+                    k in texto_norm
+                    for k in (
+                        "FOLHA NORMAL",
+                        "FERIAS COLETIVAS",
+                        "FÉRIAS COLETIVAS",
+                        "ADIANTAMENTO",
+                        "13.SALARIO",
+                        "13. SALARIO",
+                        "BR RESULTADOS",
+                    )
+                ):
                     secao_atual = texto_linha.strip()
 
                 # Rubricas começam com código de 6 dígitos e têm a denominação à direita.
@@ -104,25 +114,34 @@ def extrair_linhas(pdf_path):
                 # Identifica a quantidade usando a posição horizontal da coluna Qtde.
                 # Se a célula estiver vazia, Qtde fica como None.
                 qtde_palavras = [
-                    p for p in palavras_linha
+                    p
+                    for p in palavras_linha
                     if QTDE_X_MIN <= p["x0"] <= QTDE_X_MAX
                     and re.fullmatch(r"-?\d[\d.]*,\d{2}", p["text"])
                 ]
                 qtde = qtde_palavras[0]["text"] if qtde_palavras else None
 
-                codigo = re.match(r"^\s*(\d{6})", texto_linha).group(1)
+                data_palavras = [
+                    p for p in palavras_linha if DATA_X_MIN <= p["x0"] <= DATA_X_MAX 
+                    and re.fullmatch(r"\d{1,2}\/\d{1,2}\/\d{2,4}",p["text"])
+                ]
+                data = data_palavras[0]["text"] if data_palavras else None
 
-                registros.append({
-                    "ano": mes_atual[1] if mes_atual else None,
-                    "mes": mes_atual[0] if mes_atual else None,
-                    "codigo": codigo,
-                    "denominacao": denominacao,
-                    "natureza": natureza,
-                    "qtde": qtde,
-                    "secao": secao_atual,
-                    "pagina": numero_pagina,
-                    "linha_original": texto_linha.strip(),
-                })
+                codigo = re.match(r"^\s*(\d{6})", texto_linha).group(1)  # type: ignore
+
+                registros.append(
+                    {
+                        "ano": mes_atual[1] if mes_atual else None,
+                        "mes": mes_atual[0] if mes_atual else None,
+                        "codigo": codigo,
+                        "denominacao": denominacao,
+                        "natureza": natureza,
+                        "qtde": qtde,
+                        "data": data,
+                        "secao": secao_atual,
+                        "pagina": numero_pagina,
+                        "linha_original": texto_linha.strip(),
+                    }
+                )
 
     return registros, sorted(rubricas, key=str.casefold)
-

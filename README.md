@@ -112,5 +112,5 @@ python -m pip install -r requirements.txt
 
 ## Funcionalidades Planejadas
 - [ ] Importação de arquivos em lote, com relatório consolidado de todos os funcionários.
-- [ ] Extração de faltas por funcionário.
+- [ x ] Extração de faltas por funcionário.
 - [ ] Melhoria na interface do usuário.
